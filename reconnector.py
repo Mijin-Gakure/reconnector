@@ -8,6 +8,7 @@ import os
 import threading
 import re
 import webbrowser
+import datetime
 
 CONFIG_FILE = 'config.json'
 
@@ -27,11 +28,21 @@ def save_config(data):
 class App:
     def __init__(self, root):
         self.root = root
-        self.should_stop = False  # Flag to control the script execution
+        self.should_stop = False
+        self.timer_label = None
         self.root.title('Conan Exiles Auto-Reconnect')
         self.status_label = tk.Label(root, text='Status: Not running', fg='red')
         self.status_label.grid(row=5, column=0, columnspan=3)
         self.config = load_config()
+        self.is_reconnecting = False  # New state variable
+        
+        # Construct the session file path based on the game path in the config
+        game_path = self.config.get('game_path', '')
+        if game_path:
+            game_dir = os.path.dirname(game_path)
+            self.session_file_path = os.path.join(game_dir, 'ConanSandbox', 'Saved', 'Logs', 'session-length-tracker.json')
+        else:
+            self.session_file_path = ''        
 
         # Labels and entries
         self.path_label = tk.Label(root, text='Path to ConanSandbox.exe (for first run):')
@@ -61,11 +72,9 @@ class App:
         self.made_by_label = tk.Label(root, text='Made by Mijin for use on the Pandemonium PvE-C Server')
         self.made_by_label.grid(row=3, column=0, columnspan=3)
 
-        # Start and Stop buttons
+        # Start button
         self.start_button = tk.Button(root, text='Start', command=self.start_script)
         self.start_button.grid(row=4, column=0)
-        self.stop_button = tk.Button(root, text='Stop', command=self.stop_script)
-        self.stop_button.grid(row=4, column=1)
 
         # Discord button
         self.discord_button = tk.Button(root, text="Discord", command=lambda: self.open_link("https://discord.gg/4a67uWCc2h"))
@@ -87,85 +96,130 @@ class App:
             self.config['game_path'] = filename
             save_config(self.config)
 
+    def update_timer(self, remaining_time):
+        if self.timer_label:
+            self.timer_label.config(text=f"Next action in: {remaining_time} seconds")
+            self.root.update()
+
     def start_script(self):
+        self.should_stop = False
         self.status_label.config(text='Status: Running', fg='green')
-        # Run the script actions in a separate thread to prevent UI freezing
+        self.timer_label = tk.Label(self.root, text='Next action in: 0 seconds')
+        self.timer_label.grid(row=6, column=0, columnspan=3)
         threading.Thread(target=self.script_actions, daemon=True).start()
+                
+    def handle_disconnect(self):
+        print("Handling disconnection...")
+        self.close_game()
+        self.sleep_with_update(30)  # Wait before relaunching game
+        self.launch_game()
+        self.sleep_with_update(380)  # Wait for game to launch before clicking 'Continue'
 
-    def script_actions(self):
-        self.should_stop = False  # Reset the stop flag
-        play_button_pos = self.play_button_position.get()
+        # Extract coordinates for the 'Continue' button from the configuration
+        play_button_x, play_button_y = map(int, self.play_button_position.get().split(', '))
+        self.click_button(play_button_x, play_button_y)
 
-        # Verify user input
-        if "Click" in play_button_pos:
-            messagebox.showerror("Error", "Please train the position")
-            return
+    def monitor_log_for_disconnect(self, check_interval=15):
+        print("Checking for disconnection...")
+        try:
+            last_mod_time = os.path.getmtime(self.session_file_path)
+            print(f"Last modification time: {last_mod_time}")
+        except FileNotFoundError:
+            print("Session file not found. Assuming disconnection.")
+            return True
 
-        # Check if ConanSandbox.exe path is configured
-        game_path = self.config.get('game_path')
-        if game_path:
-            log_file_path = os.path.join(os.path.dirname(game_path), 'ConanSandbox', 'Saved', 'Logs', 'ConanSandbox.log')
+        time.sleep(check_interval)
+        try:
+            current_mod_time = os.path.getmtime(self.session_file_path)
+            print(f"Current modification time: {current_mod_time}")
+            if current_mod_time == last_mod_time:
+                print("No change in session file detected. Assuming disconnection.")
+                return True
+        except Exception as e:
+            print(f"Error accessing session file: {e}")
+            return False
 
-            # Monitor log file for disconnection and then attempt to reconnect
-            while not self.should_stop:
-                if self.monitor_log_for_disconnect(log_file_path, "Player disconnected"):
-                    self.close_game()
-                    time.sleep(30)  # Wait for 30 seconds
-
-                self.launch_game()
-                time.sleep(390)  # Wait for the game to launch and the launcher to load
-
-                # Click the 'Continue' button
-                play_button_x, play_button_y = map(int, play_button_pos.split(', '))
-                self.click_button(play_button_x, play_button_y)
-
-                # Check for "Welcomed by server" message, if not found within timeout, restart process
-                if not self.monitor_log_for_disconnect(log_file_path, "Welcomed by server", timeout=150):
-                    print("Failed to reconnect. Trying again...")
-                    self.close_game()
-                    time.sleep(30)  # Wait before trying to reconnect again
-                else:
-                    print("Reconnected successfully.")
-                    break  # Exit loop if reconnected successfully
-
-    def monitor_log_for_disconnect(self, log_file_path, pattern, timeout=None):
-        pattern_compiled = re.compile(pattern, re.IGNORECASE)
-        last_position = None
-        start_time = time.time()
-
-        while not self.should_stop and (timeout is None or time.time() - start_time < timeout):
-            try:
-                with open(log_file_path, 'r') as log_file:
-                    if last_position is not None:
-                        log_file.seek(last_position)
-                    else:
-                        log_file.seek(0, os.SEEK_END)
-
-                    log_contents = log_file.read()
-                    if pattern_compiled.search(log_contents):
-                        last_position = log_file.tell()
-                        return True
-                    else:
-                        last_position = log_file.tell()
-            except Exception as e:
-                print(f"Error reading log file: {e}")
-
-            time.sleep(10)  # Check every 10 seconds
-
+        print("Change detected in session file. No disconnection.")
         return False
 
-    def close_game(self):
-        print("Closing game...")
+    def script_actions(self):
+        print("Script actions started.")
+        while not self.should_stop:
+            print("Top of script_actions loop.")
+
+            # Check for disconnection
+            if self.monitor_log_for_disconnect():
+                print("Disconnect detected. Handling disconnection.")
+                self.handle_disconnect()  # Step 1: Close the game
+
+                # Step 2: Relaunch the game and click 'Continue'
+                self.relaunch_game_and_click_continue()
+
+                # Step 3: Monitor the session file independently for 390 seconds
+                if not self.monitor_session_file(wait_time=120):
+                    print("No reconnection detected within 120 seconds. Repeating the process.")
+                    continue  # Go back to the start of the while loop
+
+            # Wait between checks
+            self.sleep_with_update(10)
+
+            # Check if stop button was pressed
+            if self.should_stop:
+                print("Stop button pressed. Exiting script_actions loop.")
+                break
+                
+            # This makes the script wait between functions
+            self.sleep_with_update(10)
+
+    def monitor_session_file(self, wait_time=180):
+        print(f"Monitoring session file for {wait_time} seconds to confirm reconnection.")
         try:
-            # Use taskkill to close the game
+            last_mod_time = os.path.getmtime(self.session_file_path)
+            print(f"Initial session file mod time: {last_mod_time}")
+        except FileNotFoundError:
+            print(f"Session file not found: {self.session_file_path}")
+            return False
+
+        start_time = time.time()
+        while time.time() - start_time < wait_time and not self.should_stop:
+            try:
+                current_mod_time = os.path.getmtime(self.session_file_path)
+                print(f"Current session file mod time: {current_mod_time}")
+                if current_mod_time != last_mod_time:
+                    print("Session file modified, player likely reconnected.")
+                    return True
+            except Exception as e:
+                print(f"Error accessing session file: {e}")
+            time.sleep(10)  # how frequently it checks the session file for the time set above at wait_time for monitor_session_file, after the time is up it's knows a player has reconnected as long as there was a change
+            self.update_timer(wait_time - int(time.time() - start_time))
+
+        print("No change in session file detected.")
+        return False
+
+
+    def sleep_with_update(self, sleep_time):
+        for remaining in range(sleep_time, 0, -1):
+            self.update_timer(remaining)
+            time.sleep(1)
+            if self.should_stop:
+                break
+
+    def close_game(self):
+        print("Attempting to close the game...")
+        try:
             if os.name == 'nt':
-                os.system("taskkill /f /im ConanSandbox.exe")
+                subprocess.run(["taskkill", "/f", "/im", "ConanSandbox.exe"], capture_output=True)
+                print("Game close command issued.")
+            else:
+                print("Game close command not executed. Non-Windows OS detected.")
         except Exception as e:
             print(f"Error closing game: {e}")
 
     def stop_script(self):
-        self.should_stop = True  # Set the flag to stop script actions
+        self.should_stop = True
         self.status_label.config(text='Status: Not running', fg='red')
+        if self.timer_label:
+            self.timer_label.config(text='')
 
     def exit_script(self):
         self.stop_script()  # Ensure the script is stopped
@@ -189,7 +243,8 @@ class App:
         pyautogui.moveTo(x, y, duration=1)
         print("Click!")  # Debugging output
         pyautogui.click()
-    
+        self.click_time = time.time()  # Record the time of the click
+        
     def train_position(self):
         """Train the click position."""
         messagebox.showinfo("Training", "Move your mouse over the 'Continue' button and press 'Enter'.")
@@ -202,6 +257,24 @@ class App:
         self.play_button_position.set(f"{position.x}, {position.y}")
         self.config['play_button'] = f"{position.x}, {position.y}"
         save_config(self.config)
+        
+    def parse_log_time(self, log_line):
+        # Extract and parse the timestamp from the log line
+        match = re.search(r"\[([0-9]{4}\.[0-9]{2}\.[0-9]{2}-[0-9]{2}\.[0-9]{2}\.[0-9]{2}:[0-9]{3})\]", log_line)
+        if match:
+            timestamp_str = match.group(1)
+            log_datetime = datetime.datetime.strptime(timestamp_str, "%Y.%m.%d-%H.%M.%S:%f")
+            return log_datetime
+        return None
+
+    def relaunch_game_and_click_continue(self):
+        print("Relaunching game.")
+        self.launch_game()
+        self.sleep_with_update(20)  # Wait for game to launch before clicking 'Continue'
+
+        # Extract coordinates for the 'Continue' button from the configuration
+        play_button_x, play_button_y = map(int, self.play_button_position.get().split(', '))
+        self.click_button(play_button_x, play_button_y)
 
 # Main script execution
 if __name__ == "__main__":
