@@ -4,7 +4,9 @@ To utilize this script, run it, click 'browse', and locate your ConanSandbox.exe
 
 IMPORTANT: Ensure your mods are configured to match the server you are using this script on. This step is crucial to prevent the bot from restarting every time it attempts to reconnect.
 
-For a video guide:
+For a video guide: https://www.youtube.com/watch?v=UI7nRrchEK8&ab_channel=Mijin
+
+Discord: https://discord.gg/Kws8AyYPeE
 
 This tool was created by me, Mijin, for use on my private Conan Exiles server, Pandemonium PvE-C.
 
