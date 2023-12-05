@@ -2,15 +2,10 @@ This script monitors Conan Exiles log files to detect when a player has disconne
 
 To utilize this script, run it, click 'browse', and locate your ConanSandbox.exe (default location: C:\Program Files (x86)\Steam\steamapps\common\Conan Exiles\ConanSandbox.exe). With the game launcher open, click "train" and hover over the "continue" button at the bottom right of the launcher, then press enter on your keyboard. This action records the position of the continue button on your screen. Once the setup is complete, these settings will be saved to the config.json file for future use. To run the bot, simply open it with the game running, click start, and then you can walk away. If you disconnect or the server restarts, the bot will relaunch the game and reconnect you to the server. Click stop and exit when you finish using it.
 
-IMPORTANT: Ensure your mods are configured to match the server you are using this script on. This step is crucial to prevent the bot from restarting every time it attempts to reconnect.
+IMPORTANT: Ensure your mods are configured to match the server you are using this script on. This step is crucial to prevent the bot from restarting every time it attempts to reconnect. For info on how to do that watch: https://youtu.be/20ojprrxrQM?si=GHUbW2dLyVxUAEC6&t=226
 
-For a video guide: https://www.youtube.com/watch?v=UI7nRrchEK8&ab_channel=Mijin
+For a video guide on how to set Reconnector up: https://www.youtube.com/watch?v=UI7nRrchEK8&ab_channel=Mijin
 
 Discord: https://discord.gg/Kws8AyYPeE
 
 This tool was created by me, Mijin, for use on my private Conan Exiles server, Pandemonium PvE-C.
-
-
-
-
-
