@@ -144,21 +144,21 @@ class App:
 
     def script_actions(self):
         print("Script actions started.")
+
+        # Define a startup period (e.g., 60 seconds after the script starts)
+        startup_period = 10  # 10 seconds
+        start_time = time.time()
+
         while not self.should_stop:
             print("Top of script_actions loop.")
 
-            # Check for disconnection
-            if self.monitor_log_for_disconnect():
-                print("Disconnect detected. Handling disconnection.")
-                self.handle_disconnect()  # Step 1: Close the game
-
-                # Step 2: Relaunch the game and click 'Continue'
-                self.relaunch_game_and_click_continue()
-
-                # Step 3: Monitor the session file independently for 390 seconds
-                if not self.monitor_session_file(wait_time=120):
-                    print("No reconnection detected within 120 seconds. Repeating the process.")
-                    continue  # Go back to the start of the while loop
+            # Check if the startup period has passed
+            if time.time() - start_time > startup_period:
+                # Check for disconnection after the startup period
+                if self.monitor_log_for_disconnect():
+                    print("Disconnect detected. Handling disconnection.")
+                    self.handle_disconnect()
+                    # Further actions...
 
             # Wait between checks
             self.sleep_with_update(10)
@@ -167,8 +167,8 @@ class App:
             if self.should_stop:
                 print("Stop button pressed. Exiting script_actions loop.")
                 break
-                
-            # This makes the script wait between functions
+    
+            # Additional wait (if needed)
             self.sleep_with_update(10)
 
     def monitor_session_file(self, wait_time=180):
