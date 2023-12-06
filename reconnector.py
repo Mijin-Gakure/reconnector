@@ -16,13 +16,19 @@ CONFIG_FILE = 'config.json'
 def load_config():
     if os.path.isfile(CONFIG_FILE):
         with open(CONFIG_FILE, 'r') as f:
+            print("Loading configuration file.")
             return json.load(f)
     else:
+        print("Configuration file not found, loading defaults.")
         return {}
 
 def save_config(data):
-    with open(CONFIG_FILE, 'w') as f:
-        json.dump(data, f, indent=4)
+    try:
+        with open(CONFIG_FILE, 'w') as f:
+            json.dump(data, f, indent=4)
+        print("Configuration saved successfully.")
+    except Exception as e:
+        print(f"Error saving configuration: {e}")
 
 # GUI application
 class App:
@@ -106,6 +112,7 @@ class App:
         self.status_label.config(text='Status: Running', fg='green')
         self.timer_label = tk.Label(self.root, text='Next action in: 0 seconds')
         self.timer_label.grid(row=6, column=0, columnspan=3)
+        print("Starting script...")
         threading.Thread(target=self.script_actions, daemon=True).start()
                 
     def handle_disconnect(self):
@@ -113,7 +120,7 @@ class App:
         self.close_game()
         self.sleep_with_update(30)  # Wait before relaunching game
         self.launch_game()
-        self.sleep_with_update(380)  # Wait for game to launch before clicking 'Continue'
+        self.sleep_with_update(390)  # Wait for game to launch before clicking 'Continue'
 
         # Extract coordinates for the 'Continue' button from the configuration
         play_button_x, play_button_y = map(int, self.play_button_position.get().split(', '))
@@ -144,21 +151,21 @@ class App:
 
     def script_actions(self):
         print("Script actions started.")
-
-        # Define a startup period (e.g., 60 seconds after the script starts)
-        startup_period = 10  # 10 seconds
-        start_time = time.time()
-
         while not self.should_stop:
             print("Top of script_actions loop.")
 
-            # Check if the startup period has passed
-            if time.time() - start_time > startup_period:
-                # Check for disconnection after the startup period
-                if self.monitor_log_for_disconnect():
-                    print("Disconnect detected. Handling disconnection.")
-                    self.handle_disconnect()
-                    # Further actions...
+            # Check for disconnection
+            if self.monitor_log_for_disconnect():
+                print("Disconnect detected. Handling disconnection.")
+                self.handle_disconnect()  # Step 1: Close the game
+
+                # Step 2: Relaunch the game and click 'Continue'
+                self.relaunch_game_and_click_continue()
+
+                # Step 3: Monitor the session file independently for 390 seconds
+                if not self.monitor_session_file(wait_time=120):
+                    print("No reconnection detected within 120 seconds. Repeating the process.")
+                    continue  # Go back to the start of the while loop
 
             # Wait between checks
             self.sleep_with_update(10)
@@ -167,8 +174,8 @@ class App:
             if self.should_stop:
                 print("Stop button pressed. Exiting script_actions loop.")
                 break
-    
-            # Additional wait (if needed)
+                
+            # This makes the script wait between functions
             self.sleep_with_update(10)
 
     def monitor_session_file(self, wait_time=180):
