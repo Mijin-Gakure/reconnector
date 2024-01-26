@@ -112,6 +112,8 @@ class App:
         disconnect_wait_time = int(self.disconnect_wait_entry.get())
         relaunch_wait_time = int(self.relaunch_wait_entry.get())
         session_monitor_time = int(self.session_monitor_entry.get())
+        session_monitor_time = int(self.session_monitor_entry.get())
+        self.config['session_monitor_time'] = session_monitor_time
 
         # Update the config dictionary
         self.config['disconnect_wait_time'] = disconnect_wait_time
@@ -218,8 +220,9 @@ class App:
             # This makes the script wait between functions
             self.sleep_with_update(10)
 
-    def monitor_session_file(self, wait_time=180):
-        print(f"Monitoring session file for {wait_time} seconds to confirm reconnection.")
+    def monitor_session_file(self, wait_time):
+        session_monitor_time = wait_time  # Use wait_time as the session monitor time
+        print(f"Monitoring session file for {session_monitor_time} seconds to confirm reconnection.")
         try:
             last_mod_time = os.path.getmtime(self.session_file_path)
             print(f"Initial session file mod time: {last_mod_time}")
@@ -228,7 +231,7 @@ class App:
             return False
 
         start_time = time.time()
-        while time.time() - start_time < wait_time and not self.should_stop:
+        while time.time() - start_time < session_monitor_time and not self.should_stop:
             try:
                 current_mod_time = os.path.getmtime(self.session_file_path)
                 print(f"Current session file mod time: {current_mod_time}")
@@ -237,12 +240,11 @@ class App:
                     return True
             except Exception as e:
                 print(f"Error accessing session file: {e}")
-            time.sleep(10)  # how frequently it checks the session file for the time set above at wait_time for monitor_session_file, after the time is up it's knows a player has reconnected as long as there was a change
-            self.update_timer(wait_time - int(time.time() - start_time))
+            time.sleep(10)
+            self.update_timer(session_monitor_time - int(time.time() - start_time))
 
         print("No change in session file detected.")
         return False
-
 
     def sleep_with_update(self, sleep_time):
         for remaining in range(sleep_time, 0, -1):
@@ -291,19 +293,6 @@ class App:
         print("Click!")  # Debugging output
         pyautogui.click()
         self.click_time = time.time()  # Record the time of the click
-        
-    def train_position(self):
-        """Train the click position."""
-        messagebox.showinfo("Training", "Move your mouse over the 'Continue' button and press 'Enter'.")
-        self.root.update_idletasks()
-        self.root.after(1000, self.capture_position)
-
-    def capture_position(self):
-        """Capture the position after a delay."""
-        position = pyautogui.position()
-        self.play_button_position.set(f"{position.x}, {position.y}")
-        self.config['play_button'] = f"{position.x}, {position.y}"
-        save_config(self.config)
         
     def parse_log_time(self, log_line):
         # Extract and parse the timestamp from the log line
