@@ -1,0 +1,1 @@
+Download the .zip file containing the .exe from the bottom of the page here: https://github.com/Mijin-Gakure/reconnector/releases/tag/v1.3.0. If you are familiar with setting up the correct Python environment, you can use the .py file instead. This file is provided as the source code.
