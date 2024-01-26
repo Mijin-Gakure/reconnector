@@ -63,35 +63,66 @@ class App:
         self.default_location_label = tk.Label(root, text='Default location: "C:\\Program Files (x86)\\Steam\\steamapps\\common\\Conan Exiles\\ConanSandbox.exe"')
         self.default_location_label.grid(row=1, column=1, columnspan=2, sticky='w')
 
-        # Position entry (display only)
-        self.play_button_label = tk.Label(root, text='Position for "Continue" button:')
-        self.play_button_position = tk.StringVar(root, value=self.config.get('play_button', 'Click "Train" to set'))
-        self.play_button_entry = tk.Entry(root, textvariable=self.play_button_position, width=20, state='readonly')
-        self.play_button_label.grid(row=2, column=0, sticky='e')
-        self.play_button_entry.grid(row=2, column=1)
-
-        # Train button
-        self.train_button = tk.Button(root, text='Train', command=self.train_position)
-        self.train_button.grid(row=2, column=2)
-
-        # Made by label
-        self.made_by_label = tk.Label(root, text='Made by Mijin for use on the Pandemonium PvE-C Server')
-        self.made_by_label.grid(row=3, column=0, columnspan=3)
+        # Removed position entry and train button as they are not needed with image recognition
+        # Removed made by label as it does not affect functionality
 
         # Start button
         self.start_button = tk.Button(root, text='Start', command=self.start_script)
-        self.start_button.grid(row=4, column=0)
+        self.start_button.grid(row=2, column=0)  # Changed to row 2 to fill in space left by removed elements
 
         # Discord button
         self.discord_button = tk.Button(root, text="Discord", command=lambda: self.open_link("https://discord.gg/4a67uWCc2h"))
-        self.discord_button.grid(row=4, column=2)
+        self.discord_button.grid(row=2, column=2)  # Changed to row 2 to fill in space left by removed elements
 
         # Exit button
         self.exit_button = tk.Button(root, text='Exit', command=self.exit_script)
-        self.exit_button.grid(row=4, column=3)
+        self.exit_button.grid(row=2, column=3)  # Changed to row 2 to fill in space left by removed elements
+
+  # Time settings
+        self.time_settings_label = tk.Label(root, text='Time Settings (seconds):')
+        self.time_settings_label.grid(row=7, column=0, columnspan=3)
+
+        self.disconnect_wait_label = tk.Label(root, text='Disconnect Wait Time:')
+        self.disconnect_wait_entry = tk.Entry(root, width=20)
+        self.disconnect_wait_entry.insert(0, self.config.get('disconnect_wait_time', 30))
+        self.disconnect_wait_label.grid(row=8, column=0, sticky='e')
+        self.disconnect_wait_entry.grid(row=8, column=1)
+
+        self.relaunch_wait_label = tk.Label(root, text='Relaunch Wait Time:')
+        self.relaunch_wait_entry = tk.Entry(root, width=20)
+        self.relaunch_wait_entry.insert(0, self.config.get('relaunch_wait_time', 390))
+        self.relaunch_wait_label.grid(row=9, column=0, sticky='e')
+        self.relaunch_wait_entry.grid(row=9, column=1)
+
+        # Insert the new GUI elements here for session monitor time
+        self.session_monitor_label = tk.Label(root, text='Session Monitor Time:')
+        self.session_monitor_entry = tk.Entry(root, width=20)
+        self.session_monitor_entry.insert(0, self.config.get('session_monitor_time', 120))  # Default value 120
+        self.session_monitor_label.grid(row=11, column=0, sticky='e')
+        self.session_monitor_entry.grid(row=11, column=1)
+
+        self.save_time_settings_button = tk.Button(root, text='Save Time Settings', command=self.save_time_settings)
+        self.save_time_settings_button.grid(row=12, column=1)
 
     def open_link(self, url):
         webbrowser.open_new(url)
+
+    def save_time_settings(self):
+        # Get values from the GUI entries
+        disconnect_wait_time = int(self.disconnect_wait_entry.get())
+        relaunch_wait_time = int(self.relaunch_wait_entry.get())
+        session_monitor_time = int(self.session_monitor_entry.get())
+
+        # Update the config dictionary
+        self.config['disconnect_wait_time'] = disconnect_wait_time
+        self.config['relaunch_wait_time'] = relaunch_wait_time
+        self.config['session_monitor_time'] = session_monitor_time
+
+        # Save the updated config to the file
+        save_config(self.config)
+
+        # Show a message box indicating successful save
+        messagebox.showinfo("Settings Saved", "Time settings have been updated and saved.")       
 
     def browse_file(self):
         filename = filedialog.askopenfilename(initialdir="/", title="Select file",
@@ -114,17 +145,28 @@ class App:
         self.timer_label.grid(row=6, column=0, columnspan=3)
         print("Starting script...")
         threading.Thread(target=self.script_actions, daemon=True).start()
+
+    def click_continue_button(self):
+        print("Locating the 'Continue' button on the screen...")
+        script_dir = os.path.dirname(os.path.abspath(__file__))
+        continue_button_path = os.path.join(script_dir, 'continue.png')
+        
+        # Locate the 'Continue' button on screen and click it
+        continue_button_location = pyautogui.locateOnScreen(continue_button_path, confidence=0.8)
+        if continue_button_location:
+            continue_button_x, continue_button_y = pyautogui.center(continue_button_location)
+            pyautogui.click(continue_button_x, continue_button_y)
+            print("Clicked the 'Continue' button.")
+        else:
+            print("Could not find the 'Continue' button on screen.")        
                 
     def handle_disconnect(self):
         print("Handling disconnection...")
         self.close_game()
-        self.sleep_with_update(30)  # Wait before relaunching game
+        self.sleep_with_update(self.config.get('disconnect_wait_time', 30))  # Wait before relaunching game
         self.launch_game()
-        self.sleep_with_update(390)  # Wait for game to launch before clicking 'Continue'
-
-        # Extract coordinates for the 'Continue' button from the configuration
-        play_button_x, play_button_y = map(int, self.play_button_position.get().split(', '))
-        self.click_button(play_button_x, play_button_y)
+        self.sleep_with_update(self.config.get('relaunch_wait_time', 390))  # Wait for game to launch
+        self.click_continue_button()  # Click the 'Continue' button using image recognition
 
     def monitor_log_for_disconnect(self, check_interval=15):
         print("Checking for disconnection...")
@@ -157,15 +199,13 @@ class App:
             # Check for disconnection
             if self.monitor_log_for_disconnect():
                 print("Disconnect detected. Handling disconnection.")
-                self.handle_disconnect()  # Step 1: Close the game
+                self.handle_disconnect()
 
-                # Step 2: Relaunch the game and click 'Continue'
-                self.relaunch_game_and_click_continue()
-
-                # Step 3: Monitor the session file independently for 390 seconds
-                if not self.monitor_session_file(wait_time=120):
-                    print("No reconnection detected within 120 seconds. Repeating the process.")
-                    continue  # Go back to the start of the while loop
+            # Use the session monitor time from the configuration
+            session_monitor_time = self.config.get('session_monitor_time', 120)  # Default value 120
+            if not self.monitor_session_file(wait_time=session_monitor_time):
+                print(f"No reconnection detected within {session_monitor_time} seconds. Attempting reconnection.")
+                self.handle_disconnect()  # Attempt to reconnect
 
             # Wait between checks
             self.sleep_with_update(10)
@@ -274,14 +314,27 @@ class App:
             return log_datetime
         return None
 
-    def relaunch_game_and_click_continue(self):
-        print("Relaunching game.")
-        self.launch_game()
-        self.sleep_with_update(20)  # Wait for game to launch before clicking 'Continue'
+    def click_continue_button(self):
+        import sys
+        print("Locating the 'Continue' button on the screen...")
 
-        # Extract coordinates for the 'Continue' button from the configuration
-        play_button_x, play_button_y = map(int, self.play_button_position.get().split(', '))
-        self.click_button(play_button_x, play_button_y)
+        # Check if running as a PyInstaller bundle
+        if getattr(sys, 'frozen', False):
+            # If bundled, the file is in the same directory as the executable
+            continue_button_path = os.path.join(sys._MEIPASS, 'continue.png')
+        else:
+            # If not bundled, the file is in the script's directory
+            script_dir = os.path.dirname(os.path.abspath(__file__))
+            continue_button_path = os.path.join(script_dir, 'continue.png')
+
+        # Locate the 'Continue' button on screen and click it
+        continue_button_location = pyautogui.locateOnScreen(continue_button_path, confidence=0.8)
+        if continue_button_location:
+            continue_button_x, continue_button_y = pyautogui.center(continue_button_location)
+            pyautogui.click(continue_button_x, continue_button_y)
+            print("Clicked the 'Continue' button.")
+        else:
+            print("Could not find the 'Continue' button on screen.")
 
 # Main script execution
 if __name__ == "__main__":
