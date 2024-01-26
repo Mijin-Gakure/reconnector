@@ -20,8 +20,7 @@ python -m pip install --upgrade pip
 python -m pip install pyautogui
 python -m pip install Pillow
 
-:: Add additional module installation commands here
-:: python -m pip install [module_name]
+:: No additional module installations are required for the script
 
 echo Installation complete.
 
