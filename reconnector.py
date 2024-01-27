@@ -9,6 +9,7 @@ import threading
 import re
 import webbrowser
 import datetime
+import sys
 
 CONFIG_FILE = 'config.json'
 
@@ -150,9 +151,18 @@ class App:
 
     def click_continue_button(self):
         print("Locating the 'Continue' button on the screen...")
-        script_dir = os.path.dirname(os.path.abspath(__file__))
-        continue_button_path = os.path.join(script_dir, 'continue.png')
-        
+
+        # Determine the directory of the executable
+        if getattr(sys, 'frozen', False):
+            # If running as a standalone executable
+            application_dir = os.path.dirname(sys.executable)
+        else:
+            # If running as a script
+            application_dir = os.path.dirname(os.path.abspath(__file__))
+
+        # Path to the continue button image
+        continue_button_path = os.path.join(application_dir, 'continue.png')
+
         # Locate the 'Continue' button on screen and click it
         continue_button_location = pyautogui.locateOnScreen(continue_button_path, confidence=0.8)
         if continue_button_location:
@@ -160,7 +170,7 @@ class App:
             pyautogui.click(continue_button_x, continue_button_y)
             print("Clicked the 'Continue' button.")
         else:
-            print("Could not find the 'Continue' button on screen.")        
+            print("Could not find the 'Continue' button on screen.")
                 
     def handle_disconnect(self):
         print("Handling disconnection...")
@@ -285,14 +295,6 @@ class App:
                 subprocess.Popen(['xdg-open', steam_url])  # For Unix systems
         except Exception as e:
             messagebox.showerror("Error", f"Failed to start the game through Steam: {e}")
-
-    def click_button(self, x, y):
-        """Click a button on the screen at the specified x, y coordinates."""
-        print(f"Moving mouse to: x={x}, y={y}")  # Debugging output
-        pyautogui.moveTo(x, y, duration=1)
-        print("Click!")  # Debugging output
-        pyautogui.click()
-        self.click_time = time.time()  # Record the time of the click
         
     def parse_log_time(self, log_line):
         # Extract and parse the timestamp from the log line
@@ -304,17 +306,13 @@ class App:
         return None
 
     def click_continue_button(self):
-        import sys
         print("Locating the 'Continue' button on the screen...")
 
-        # Check if running as a PyInstaller bundle
-        if getattr(sys, 'frozen', False):
-            # If bundled, the file is in the same directory as the executable
-            continue_button_path = os.path.join(sys._MEIPASS, 'continue.png')
-        else:
-            # If not bundled, the file is in the script's directory
-            script_dir = os.path.dirname(os.path.abspath(__file__))
-            continue_button_path = os.path.join(script_dir, 'continue.png')
+        # Determine the directory of the executable or script
+        application_dir = os.path.dirname(sys.executable) if getattr(sys, 'frozen', False) else os.path.dirname(os.path.abspath(__file__))
+
+        # Path to the continue button image
+        continue_button_path = os.path.join(application_dir, 'continue.png')
 
         # Locate the 'Continue' button on screen and click it
         continue_button_location = pyautogui.locateOnScreen(continue_button_path, confidence=0.8)
